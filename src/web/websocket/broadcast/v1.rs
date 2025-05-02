@@ -1,7 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use futures::SinkExt;
-use tokio::sync::{RwLock, broadcast as bc};
+use tokio::sync::{RwLock, broadcast as bc, mpsc};
 
 pub use split::{Receiver, Sender};
 
@@ -12,18 +12,19 @@ pub struct Broadcast<T: Clone> {
 
 #[derive(Debug)]
 pub struct Room<T: Clone> {
-    clients: Vec<SocketAddr>,
+    clients: Vec<(SocketAddr, mpsc::Sender<Message<T>>)>,
     tx: bc::Sender<Message<T>>,
 }
 
 pub struct BroadcastRemote<T: Clone> {
-    receiver: bc::Receiver<Message<T>>,
+    room_rx: bc::Receiver<Message<T>>,
+    client_rx: mpsc::Receiver<Message<T>>,
     broadcast: Broadcast<T>,
     my_id: SocketAddr,
     current_room: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Message<T: Clone> {
     pub(self) broadcaster_id: Option<SocketAddr>,
     pub(self) payload: T,
@@ -43,19 +44,27 @@ impl<T: Clone> Broadcast<T> {
 
         let room_name = room_name.as_ref();
 
+        let (client_tx, client_rx) = mpsc::channel(16);
+
         match w_lock.get_mut(room_name) {
             Some(room) => {
-                let rx = room.tx.subscribe();
-                room.clients.push(id);
-                BroadcastRemote::new(self.clone(), rx, id, room_name.to_string())
+                let room_rx = room.tx.subscribe();
+                room.clients.push((id, client_tx));
+                BroadcastRemote::new(self.clone(), room_rx, client_rx, id, room_name.to_string())
             }
             None => {
-                let (tx, rx) = bc::channel(64);
+                let (room_tx, room_rx) = bc::channel(64);
 
-                let mut room = Room::new(tx);
-                room.clients.push(id);
+                let mut room = Room::new(room_tx);
+                room.clients.push((id, client_tx));
 
-                let remote = BroadcastRemote::new(self.clone(), rx, id, room_name.to_string());
+                let remote = BroadcastRemote::new(
+                    self.clone(),
+                    room_rx,
+                    client_rx,
+                    id,
+                    room_name.to_string(),
+                );
 
                 w_lock.insert(room_name.to_string(), room);
 
@@ -74,7 +83,7 @@ impl<T: Clone> Broadcast<T> {
                 .clients
                 .iter()
                 .enumerate()
-                .find_map(|(i, entry_id)| if entry_id == &id { Some(i) } else { None });
+                .find_map(|(i, (entry_id, _))| if entry_id == &id { Some(i) } else { None });
 
             if let Some(i) = del_id {
                 drop(r_lock);
@@ -99,15 +108,15 @@ impl Broadcast<crate::web::OutgoingMessage> {
 
         let w_lock = self.rooms.write().await;
         if let Some(room) = w_lock.get(room_name) {
-            let payload = payload::ClientListUpdate {
-                props: payload::prop::ClientListUpdate {
-                    clients: room.clients.clone(),
+            let payload = payload::UpdateClientList {
+                props: payload::prop::UpdateClientList {
+                    clients: room.clients.clone().into_iter().map(|(id, _)| id).collect(),
                 },
             };
 
             let message = Message {
                 broadcaster_id: exclude,
-                payload: transmit::Message::ClientListUpdate(payload),
+                payload: transmit::Message::UpdateClientList(payload),
             };
 
             let _ = room.tx.send(message);
@@ -119,12 +128,14 @@ impl Broadcast<crate::web::OutgoingMessage> {
 impl<T: Clone> BroadcastRemote<T> {
     pub(self) fn new(
         broadcast: Broadcast<T>,
-        receiver: bc::Receiver<Message<T>>,
+        room_rx: bc::Receiver<Message<T>>,
+        client_rx: mpsc::Receiver<Message<T>>,
         my_id: SocketAddr,
         current_room: String,
     ) -> Self {
         Self {
-            receiver,
+            room_rx,
+            client_rx,
             broadcast,
             my_id,
             current_room,
@@ -148,22 +159,32 @@ impl<T: Clone> BroadcastRemote<T> {
 
     pub async fn recv(&mut self) -> Option<T> {
         loop {
-            let message = self.receiver.recv().await;
+            let message = tokio::select! {
+                m = self.room_rx.recv() => {
+                    match m {
+                        Ok(m) => Some(m),
+                        Err(bc::error::RecvError::Closed) => {
+                            return None;
+                        }
+                        Err(e) => {
+                            dbg!("v1::broadcast receive error", e);
+
+                            continue;
+                        }
+                    }
+                },
+                m = self.client_rx.recv() => m,
+            };
 
             match message {
-                Ok(m) => {
+                Some(m) => {
                     if m.broadcaster_id.is_some_and(|id| id == self.my_id) {
                         continue;
                     };
 
                     return Some(m.payload);
                 }
-                Err(bc::error::RecvError::Closed) => {
-                    return None;
-                }
-                Err(e) => {
-                    dbg!("v2::broadcast receive error", e);
-
+                None => {
                     continue;
                 }
             }
@@ -186,7 +207,8 @@ pub mod split {
     impl<T: Clone> BroadcastRemote<T> {
         pub fn split(self) -> (Sender<T>, Receiver<T>) {
             let Self {
-                receiver,
+                room_rx,
+                client_rx,
                 broadcast,
                 my_id,
                 current_room,
@@ -199,7 +221,8 @@ pub mod split {
             };
 
             let rx = Receiver {
-                receiver,
+                room_rx,
+                client_rx,
                 my_id,
                 // broadcast,
                 // current_room,
@@ -216,11 +239,23 @@ pub mod split {
     }
 
     pub struct Receiver<T: Clone> {
-        pub(self) receiver: bc::Receiver<Message<T>>,
+        pub(self) room_rx: bc::Receiver<Message<T>>,
+        pub(self) client_rx: mpsc::Receiver<Message<T>>,
         pub(self) my_id: SocketAddr,
         // for cleanup (leaving room on Drop)
         // pub(self) broadcast: Broadcast<T>,
         // pub(self) current_room: String,
+    }
+
+    mod error {
+        use tokio::sync::mpsc;
+
+        #[derive(Debug)]
+        pub enum SendError<T: Clone> {
+            /// The target client was not found
+            NotFound,
+            MpscError(mpsc::error::SendError<T>),
+        }
     }
 
     impl<T: Clone> Sender<T> {
@@ -241,27 +276,65 @@ pub mod split {
 
             room.tx.send(message)
         }
+
+        pub async fn send_to(
+            &self,
+            target_client: SocketAddr,
+            message: T,
+        ) -> Result<(), error::SendError<Message<T>>> {
+            let r_lock = self.broadcast.rooms.read().await;
+
+            let room = r_lock
+                .get(&self.current_room)
+                .expect("The room we've been given should exist");
+
+            if let Some((_t_id, target_tx)) =
+                room.clients.iter().find(|(id, _)| *id == target_client)
+            {
+                let message = Message {
+                    broadcaster_id: Some(self.my_id),
+                    payload: message,
+                };
+
+                target_tx
+                    .send(message)
+                    .await
+                    .map_err(self::error::SendError::MpscError)
+            } else {
+                Err(self::error::SendError::NotFound)
+            }
+        }
     }
 
     impl<T: Clone> Receiver<T> {
         pub async fn recv(&mut self) -> Option<T> {
             loop {
-                let message = self.receiver.recv().await;
+                let message = tokio::select! {
+                    m = self.room_rx.recv() => {
+                        match m {
+                            Ok(m) => Some(m),
+                            Err(bc::error::RecvError::Closed) => {
+                                return None;
+                            }
+                            Err(e) => {
+                                dbg!("v1::broadcast receive error", e);
+
+                                continue;
+                            }
+                        }
+                    },
+                    m = self.client_rx.recv() => m,
+                };
 
                 match message {
-                    Ok(m) => {
+                    Some(m) => {
                         if m.broadcaster_id.is_some_and(|id| id == self.my_id) {
                             continue;
                         };
 
                         return Some(m.payload);
                     }
-                    Err(bc::error::RecvError::Closed) => {
-                        return None;
-                    }
-                    Err(e) => {
-                        dbg!("v2::broadcast receive error", e);
-
+                    None => {
                         continue;
                     }
                 }
