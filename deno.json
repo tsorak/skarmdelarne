@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "$/": "./",
+    "@hono/hono": "jsr:@hono/hono@^4.7.11"
+  },
+  "tasks" : {
+    "dev": "deno run --allow-all --watch=src/ src/main.ts"
+  }
+}
