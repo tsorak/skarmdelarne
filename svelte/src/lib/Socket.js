@@ -5,8 +5,12 @@ export class Socket {
   /** @type {Promise<void>} _is_connected */
   _is_connected;
 
+  /** @type {Map<string, Function>} payloadHandlers */
+  payloadHandlers;
+
   constructor(url) {
     this.ws = new WebSocket(url);
+    this.payloadHandlers = new Map();
 
     let res, rej;
     this._is_connected = new Promise((resolve, reject) => {
@@ -22,15 +26,39 @@ export class Socket {
       console.error(e);
       rej();
     });
-    this.on("message", (v) => route(v));
+    this.on("message", (ev) => this.route(ev));
     this.on("close", (c) => {
       console.log(c);
       rej();
     });
   }
 
+  /**
+   * @param {string} ev
+   * @param {Function} cb
+   */
   on(ev, cb) {
-    this.ws.addEventListener(ev, cb);
+    if (["open", "error", "message", "close"].includes(ev)) {
+      this.ws.addEventListener(ev, cb);
+    } else {
+      this.payloadHandlers.set(ev, cb);
+    }
+  }
+
+  route(ev) {
+    const msg = parseMessage(ev);
+    if (!msg) {
+      return console.error("Failed to parse message", ev);
+    }
+
+    const cb = this.payloadHandlers.get(msg.type ?? "");
+    if (!cb) {
+      return console.warn("No handler exists for the received message", ev);
+    }
+
+    cb(msg.props ?? null);
+
+    console.log(msg);
   }
 
   offer(o) {
@@ -49,12 +77,10 @@ export class Socket {
   }
 }
 
-function route(d) {
+function parseMessage(ev) {
   try {
-    d = JSON.parse(d);
+    return JSON.parse(ev.data);
   } catch (_e) {
-    //
+    return false;
   }
-
-  console.log(d);
 }

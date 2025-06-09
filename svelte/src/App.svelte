@@ -1,22 +1,45 @@
 <script>
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
-  import { setupRTC } from './lib/rtc.js'
-  import { Socket } from './lib/Socket.js'
+  import svelteLogo from "./assets/svelte.svg";
+  import viteLogo from "/vite.svg";
+  import Counter from "./lib/Counter.svelte";
+  import { setupRTC } from "./lib/rtc.js";
+  import { Socket } from "./lib/Socket.js";
 
   const peerConnection = setupRTC();
   console.dir(peerConnection);
 
   const socket = new Socket("/ws");
+  const sessionState = {
+    id: "",
+    roomClients: [],
+  };
 
-  peerConnection.createOffer().then(offer => {
+  socket.on("updateIdentity", (props) => {
+    sessionState.id = props.yourId;
+    console.log(sessionState);
+  });
+
+  socket.on("updateClientList", (props) => {
+    sessionState.roomClients = props.clients;
+    console.log(sessionState);
+
+    const others = sessionState.roomClients.reduce((acc, v) => {
+      if (v !== sessionState.id) {
+        acc.push(v);
+      }
+
+      return acc;
+    }, []);
+
+    console.log("Others in room:", others);
+  });
+
+  peerConnection.createOffer().then((offer) => {
     peerConnection.setLocalDescription(offer);
 
     console.log(offer);
     socket.offer(offer);
   });
-
 
   async function startSharing() {
     const v = document.querySelector("#local-screen");
@@ -25,11 +48,14 @@
     const dev = navigator.mediaDevices;
 
     if (!dev) {
-      console.error("No access to media devices.")
+      console.error("No access to media devices.");
       return;
     }
 
-    const screenCapture = await dev.getDisplayMedia({video:true,audio:true});
+    const screenCapture = await dev.getDisplayMedia({
+      video: true,
+      audio: true,
+    });
 
     v.srcObject = screenCapture;
   }
@@ -51,14 +77,17 @@
   </div>
 
   <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
+    Check out <a
+      href="https://github.com/sveltejs/kit#readme"
+      target="_blank"
+      rel="noreferrer">SvelteKit</a
+    >, the official Svelte app framework powered by Vite!
   </p>
 
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
+  <p class="read-the-docs">Click on the Vite and Svelte logos to learn more</p>
 
-  <button type="button" onclick={() => startSharing()}>Start Screenshare</button>
+  <button type="button" onclick={() => startSharing()}>Start Screenshare</button
+  >
   <div class="xdd">
     <div class="vcontainer">
       <p>my stream</p>

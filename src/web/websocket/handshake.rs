@@ -11,7 +11,7 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 
-use crate::web::{AppState, OutgoingMessage, websocket::broadcast as bc};
+use crate::web::{AppState, OutgoingMessage, payload, websocket::broadcast as bc};
 
 pub async fn handler(
     State(state): State<AppState>,
@@ -23,6 +23,13 @@ pub async fn handler(
 
 async fn handle_socket(socket: WebSocket, who: SocketAddr, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
+
+    let identity_info =
+        serde_json::to_string(&OutgoingMessage::UpdateIdentity(payload::UpdateIdentity {
+            props: payload::prop::UpdateIdentity { your_id: who },
+        }))
+        .unwrap();
+    let _ = sender.send(Message::Text(identity_info.into())).await;
 
     let (room_tx, mut room_rx) = state.sockets.join("default", who).await.split();
 

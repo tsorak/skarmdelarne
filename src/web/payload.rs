@@ -60,6 +60,12 @@ pub mod prop {
     pub struct UpdateIdentity {
         pub your_id: SocketAddr,
     }
+
+    impl UpdateIdentity {
+        pub fn new(who: SocketAddr) -> Self {
+            Self { your_id: who }
+        }
+    }
 }
 
 pub mod webapi {
