@@ -1,7 +1,7 @@
 import { Hono } from "@hono/hono";
 import appState from "$/http/appState.ts";
 
-export default function client() {
+export default function streaming() {
   const app = new Hono();
 
   app.post("/", async (c) => {

@@ -1,14 +1,48 @@
 import { createContext, useContext } from "solid-js";
 
 import api from "../api.js";
+import apiHelper from "../route/Room/apiHelper.js";
 
 const ScreenshareContext = createContext();
 
 export function ScreenshareProvider(props) {
   const state = {
     handlers: {},
+    peers: {},
     init: setupReceiver,
     on: handleMessage,
+    addPeer: async function (viewerId, myStream, myId) {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+
+      myStream.getTracks().forEach((track) => {
+        pc.addTrack(track, myStream);
+      });
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const success = apiHelper.sendOffer(offer, viewerId, myId);
+
+      this.peers[viewerId] = { pc };
+      return success;
+    },
+    handleOffer: async function (offer, streamerId, ontrack, myId) {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+
+      pc.ontrack = ontrack;
+
+      await pc.setRemoteDescription(offer);
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      const success = apiHelper.sendAnswer(answer, streamerId, myId);
+
+      this.peers[streamerId] = { pc };
+      return success;
+    },
   };
 
   return (
@@ -18,7 +52,15 @@ export function ScreenshareProvider(props) {
   );
 }
 
-/** @returns {{init: Function, _source: EventSource, on: typeof handleMessage }} */
+/** @returns {{
+ * init: Function,
+ * _source: EventSource,
+ * on: typeof handleMessage,
+ * addPeer: (peerId: string, myStream: MediaStream, myId: string) => Promise<boolean>,
+ * handleOffer: (offer: Object, from: string, s: signals) => Promise<boolean>,
+ * peers: {[k: string]: { pc: RTCPeerConnection }}
+ * }}
+ */
 export function useScreenshare() {
   return useContext(ScreenshareContext);
 }
@@ -99,16 +141,16 @@ function handleMessage(type, cb) {
  *
  * @typedef {Object} AskToWatch
  * @property {"askToWatch"} type
- * @property {string} by
+ * @property {string} viewerId,
  *
  * @typedef {Object} Offer
  * @property {"offer"} type
- * @property {string} from
+ * @property {string} streamerId,
  * @property {{sdp: string, type: string}} offer
  *
  * @typedef {Object} Answer
  * @property {"answer"} type
- * @property {string} by
+ * @property {string} viewerId,
  * @property {{sdp: string, type: string}} answer
  *
  * @typedef {Object} ClientUpdate

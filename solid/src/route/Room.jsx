@@ -63,6 +63,32 @@ export default function Room(props) {
     }
   });
 
+  sscx.on("askToWatch", ({ viewerId }) => {
+    const myId = s.myId.get();
+    const myScreen = s.clients.v[myId].stream;
+    sscx.addPeer(viewerId, myScreen, myId);
+  });
+
+  sscx.on("offer", ({ offer, streamerId }) => {
+    const myId = s.myId.get();
+
+    const ontrack = (ev) => {
+      s.clients.mut(
+        streamerId,
+        produce((state) => {
+          state.stream = ev.streams[0];
+          console.log("LOL", ev.streams);
+        }),
+      );
+    };
+
+    sscx.handleOffer(offer, streamerId, ontrack, myId);
+  });
+
+  sscx.on("answer", async ({ answer, viewerId }) => {
+    await sscx.peers[viewerId].pc.setRemoteDescription(answer);
+  });
+
   const handle = {
     setNickname: (ev) => {
       ev.preventDefault();
@@ -135,32 +161,47 @@ function ClientCard(props) {
 function StreamCard(props) {
   const { c: client, s } = props;
 
+  const isMe = s.myId.cmp(client.id);
+
   return (
     <>
-      <video
-        class="absolute z-10 w-full h-full"
-        controls
-        autoplay
-        prop:srcObject={s.clients.v[client.id]?.stream || null}
-      />
+      <Show when={s.clients.v[client.id]?.stream}>
+        <video
+          class="absolute z-10 w-full h-full"
+          controls
+          autoplay
+          prop:srcObject={s.clients.v[client.id]?.stream || null}
+        />
+      </Show>
       <div class="absolute z-11 w-full h-full flex flex-col pointer-events-none">
         <div class="flex justify-between">
           <p class="w-min bg-[#0004]">{client.name}</p>
-          {s.myId.cmp(client.id) &&
-            (
-              <button
-                type="button"
-                class="cursor-pointer pointer-events-auto"
-                onclick={function () {
-                  this.disabled = true;
-                  handleStopStream(client, s);
-                }}
-              >
-                Stop streaming
-              </button>
-            )}
+          <Show when={isMe}>
+            <button
+              type="button"
+              class="cursor-pointer pointer-events-auto"
+              onclick={function () {
+                this.disabled = true;
+                handleStopStream(client, s);
+              }}
+            >
+              Stop streaming
+            </button>
+          </Show>
         </div>
         <div class="flex-grow flex flex-col justify-center items-center">
+          <Show when={!isMe && !s.clients.v[client.id]?.stream}>
+            <button
+              type="button"
+              class="cursor-pointer pointer-events-auto"
+              onclick={function () {
+                this.disabled = true;
+                apiHelper.askToWatch(client.id, s.myId.get());
+              }}
+            >
+              Watch
+            </button>
+          </Show>
         </div>
         <div>
         </div>
@@ -174,8 +215,9 @@ async function handleStartStream(my, s) {
 
   if (!ok) return;
 
+  console.log(screen);
+
   s.clients.mut(my.id, { stream: screen });
- 
 
   const success = await apiHelper.setStreaming(my.id, true);
   console.log(

@@ -105,19 +105,19 @@ interface RoomData {
 
 interface AskToWatch {
   type: "askToWatch";
-  by: string;
+  viewerId: string;
 }
 
 interface Offer {
   type: "offer";
-  from: string;
+  streamerId: string;
   offer: { sdp: string; type: string };
 }
 
 interface Answer {
   type: "answer";
-  by: string;
-  offer: { sdp: string; type: string };
+  viewerId: string;
+  answer: { sdp: string; type: string };
 }
 
 interface ClientUpdate {
