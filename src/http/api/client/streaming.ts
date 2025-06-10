@@ -1,0 +1,25 @@
+import { Hono } from "@hono/hono";
+import appState from "$/http/appState.ts";
+
+export default function client() {
+  const app = new Hono();
+
+  app.post("/", async (c) => {
+    const { id, streaming: isStreaming } = await c.req.json() as Payload;
+
+    const [updated, entry] = appState.clients().isStreaming(id, isStreaming);
+
+    if (updated) {
+      appState.clients().broadcast.clientUpdate(entry);
+    }
+
+    return c.text("OK");
+  });
+
+  return app;
+}
+
+interface Payload {
+  id: string;
+  streaming: boolean;
+}

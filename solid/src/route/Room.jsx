@@ -1,9 +1,8 @@
-import { createSignal, For, Show } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createEffect, createSignal, For, Show } from "solid-js";
+import { createStore, unwrap } from "solid-js/store";
 
 import { createCachedSignal } from "../util/cachedSignal.js";
 import { useScreenshare } from "../context/screenshare.jsx";
-import { onCleanup } from "solid-js";
 
 import api from "../api.js";
 
@@ -58,9 +57,12 @@ export default function Room(props) {
   //   }
   // });
 
-  onCleanup(() => {
-    s.clients.mut({});
-  });
+  // createEffect(() => {
+  // });
+
+  // onCleanup(() => {
+  //   s.clients.mut({});
+  // });
 
   const handle = {
     setNickname: (ev) => {
@@ -106,12 +108,7 @@ function ClientCard(props) {
       class={`relative w-[480px] h-[270px] bg-black text-white flex flex-col`}
     >
       <Show when={!client.streaming} fallback={<StreamCard c={client} s={s} />}>
-        <div>
-        </div>
-        <div class="flex-grow flex flex-col justify-center items-center">
-          <p class="text-3xl">{client.name}</p>
-        </div>
-        <div>
+        <div class="flex justify-end">
           {s.myId.cmp(client.id) &&
             (
               <button
@@ -126,6 +123,11 @@ function ClientCard(props) {
               </button>
             )}
         </div>
+        <div class="flex-grow flex flex-col justify-center items-center">
+          <p class="text-3xl">{client.name}</p>
+        </div>
+        <div>
+        </div>
       </Show>
     </div>
   );
@@ -136,55 +138,100 @@ function StreamCard(props) {
 
   return (
     <>
-      <div>
-        <p class="w-min bg-[#0004]">{client.name}</p>
-      </div>
-      <div class="flex-grow flex flex-col justify-center items-center">
-      </div>
-      <div>
-        {s.myId.cmp(client.id) &&
-          (
-            <button type="button" class="cursor-pointer">
-              Stop streaming
-            </button>
-          )}
+      <video
+        class="absolute z-10 w-full h-full"
+        controls
+        autoplay
+        prop:srcObject={s.clients.v[client.id]?.stream || null}
+      />
+      <div class="absolute z-11 w-full h-full flex flex-col pointer-events-none">
+        <div class="flex justify-between">
+          <p class="w-min bg-[#0004]">{client.name}</p>
+          {s.myId.cmp(client.id) &&
+            (
+              <button
+                type="button"
+                class="cursor-pointer pointer-events-auto"
+                onclick={function () {
+                  this.disabled = true;
+                  handleStopStream(client, s);
+                }}
+              >
+                Stop streaming
+              </button>
+            )}
+        </div>
+        <div class="flex-grow flex flex-col justify-center items-center">
+        </div>
+        <div>
+        </div>
       </div>
     </>
   );
 }
 
-async function handleStartStream(my) {
-  const media = navigator.mediaDevices;
+async function handleStartStream(my, s) {
+  const [ok, screen] = await getScreen();
 
-  if (!media) {
-    console.error(
-      "NEED TO BE ON HTTPS OR LOCALHOST TO GET navigator.mediaDevices",
-    );
-    return;
-  }
+  if (!ok) return;
 
-  const screen = await media.getDisplayMedia();
+  s.clients.mut(my.id, { stream: screen });
 
   const success = await apiHelper.setStreaming(my.id, true);
   console.log(
     success
       ? "Server knows we are streaming"
-      : "Server rejected our streaming state",
+      : "Server rejected our *start* streaming status",
   );
 }
 
-const HEADER = {
-  CONTENT_JSON: { "Content-Type": "application/json" },
-};
+async function handleStopStream(my, s) {
+  s.clients.mut(my.id, (state) => {
+    state.stream.getTracks().forEach((track) => {
+      track.stop();
+    });
+
+    return { ...state, stream: null };
+  });
+
+  const success = await apiHelper.setStreaming(
+    my.id,
+    false,
+  );
+
+  console.log(
+    success
+      ? "Server knows we stopped streaming"
+      : "Server rejected our *stopped* streaming status",
+  );
+}
 
 const apiHelper = {
   setStreaming: async (clientId, b) => {
     const resp = await fetch(`${api.base}/api/client/streaming`, {
       method: "POST",
-      headers: HEADER.CONTENT_JSON,
+      headers: api.HEADER.CONTENT_JSON,
       body: JSON.stringify({ id: clientId, streaming: b }),
     });
 
     return resp.ok;
   },
 };
+
+async function getScreen() {
+  const media = navigator.mediaDevices;
+
+  if (!media) {
+    console.error(
+      "NEED TO BE ON HTTPS OR LOCALHOST TO GET navigator.mediaDevices",
+    );
+    return [false, null];
+  }
+
+  const screen = await media.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+
+  return [true, screen];
+}

@@ -37,6 +37,32 @@ const state = {
 
         return Array.from(iter);
       },
+      isStreaming: (
+        id: string,
+        isStreaming: boolean,
+      ): [false, null] | [true, PublicClient] => {
+        const v = this.data.clients.get(id);
+        if (!v) return [false, null];
+
+        v.streaming = isStreaming;
+
+        this.data.clients.set(id, v);
+
+        const publicClient: PublicClient = {
+          id: v.id,
+          name: v.name,
+          streaming: v.streaming,
+        };
+
+        return [true, publicClient];
+      },
+      broadcast: {
+        clientUpdate: (entry: PublicClient) => {
+          this.data.clients.forEach((client) => {
+            client.send({ type: "clientUpdate", client: entry });
+          });
+        },
+      },
     };
   },
 };
@@ -47,6 +73,8 @@ interface Client {
   streaming: boolean;
   send: (m: Message) => Promise<void>;
 }
+
+type PublicClient = Pick<Client, "id" | "name" | "streaming">;
 
 export default state;
 export type Message =
@@ -63,7 +91,7 @@ export type Message =
 interface InitialRoomData {
   type: "initialRoomData";
   yourId: string;
-  clients: Pick<Client, "id" | "name" | "streaming">[];
+  clients: PublicClient[];
 }
 
 interface AskToWatch {
@@ -85,5 +113,5 @@ interface Answer {
 
 interface ClientUpdate {
   type: "clientUpdate";
-  client: Pick<Client, "id" | "name" | "streaming">;
+  client: PublicClient;
 }
