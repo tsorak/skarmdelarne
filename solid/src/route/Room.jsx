@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createStore, produce, reconcile } from "solid-js/store";
 
 import { createCachedSignal } from "../util/cachedSignal.js";
 import { useScreenshare } from "../context/screenshare.jsx";
@@ -10,7 +10,10 @@ import apiHelper from "./Room/apiHelper.js";
 
 export default function Room(props) {
   const s = (() => {
-    const [clients, mutClients] = createStore({});
+    /** @type {{id: string, name: string, streaming: boolean}[]} */
+    const _default_clients = [];
+
+    const [clients, mutClients] = createStore(_default_clients);
     const [showNickInput, setShowNickInput] = createSignal(true);
     const [myId, setMyId] = createSignal("");
 
@@ -19,7 +22,6 @@ export default function Room(props) {
       clients: {
         v: clients,
         mut: mutClients,
-        values: () => Array.from(Object.values(clients)),
       },
       showNickInput: { get: showNickInput, set: setShowNickInput },
       myId: { get: myId, set: setMyId, cmp: (v) => myId() === v },
@@ -28,19 +30,22 @@ export default function Room(props) {
 
   const sscx = useScreenshare();
 
-  sscx.on("initialRoomData", (body) => {
-    const entries = body.clients.map((v) => [v.id, v]);
-    const obj = Object.fromEntries(entries);
+  sscx.on("roomData", ({ clients, yourId }) => {
+    // const entries = clients.map((v) => [v.id, v]);
+    // const obj = Object.fromEntries(entries);
 
-    s.myId.set(body.yourId);
-    s.clients.mut(obj);
+    s.myId.set(yourId);
+    s.clients.mut(reconcile(clients));
   });
 
   sscx.on("clientUpdate", ({ client }) => {
-    s.clients.mut(client.id, {
-      name: client.name,
-      streaming: client.streaming,
-    });
+    s.clients.mut(produce((state) => {
+      const i = state.findIndex((v) => v.id == client.id);
+      if (i == -1) return;
+
+      state[i].name = client.name;
+      state[i].streaming = client.streaming;
+    }));
   });
 
   const handle = {
@@ -71,7 +76,7 @@ export default function Room(props) {
         </form>
       </Show>
       <div class="h-full flex flex-wrap justify-center items-center">
-        <For each={s.clients.values()}>
+        <For each={s.clients.v}>
           {(c) => <ClientCard c={c} s={s} />}
         </For>
       </div>
@@ -121,7 +126,8 @@ function StreamCard(props) {
         class="absolute z-10 w-full h-full"
         controls
         autoplay
-        prop:srcObject={s.clients.v[client.id]?.stream || null}
+        prop:srcObject={s.clients.v.find((v) => v.id == client.id)?.stream ||
+          null}
       />
       <div class="absolute z-11 w-full h-full flex flex-col pointer-events-none">
         <div class="flex justify-between">
@@ -154,7 +160,12 @@ async function handleStartStream(my, s) {
 
   if (!ok) return;
 
-  s.clients.mut(my.id, { stream: screen });
+  s.clients.mut(produce((state) => {
+    const i = state.findIndex((v) => v.id == my.id);
+    if (i == -1) return;
+
+    state[i].stream = screen;
+  }));
 
   const success = await apiHelper.setStreaming(my.id, true);
   console.log(
@@ -165,13 +176,15 @@ async function handleStartStream(my, s) {
 }
 
 async function handleStopStream(my, s) {
-  s.clients.mut(my.id, (state) => {
-    state.stream.getTracks().forEach((track) => {
+  s.clients.mut(produce((state) => {
+    const i = state.findIndex((v) => v.id == my.id);
+    if (i == -1) return;
+
+    state[i].stream.getTracks().forEach((track) => {
       track.stop();
     });
-
-    return { ...state, stream: null };
-  });
+    state[i].stream = null;
+  }));
 
   const success = await apiHelper.setStreaming(
     my.id,

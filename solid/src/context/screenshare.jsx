@@ -54,8 +54,8 @@ function setupReceiver() {
 
 /**
  * @overload
- * @param {"initialRoomData"} type
- * @param {(v: InitialRoomData) => void} cb
+ * @param {"roomData"} type
+ * @param {(v: RoomData) => void} cb
  */
 /**
  * @overload
@@ -78,7 +78,7 @@ function setupReceiver() {
  * @param {(v: ClientUpdate) => void} cb
  */
 /**
- * @param {"initialRoomData" | "askToWatch" | "offer" | "answer" | "clientUpdate"} type
+ * @param {"roomData" | "askToWatch" | "offer" | "answer" | "clientUpdate"} type
  * @param {(v: Message) => void} cb
  */
 function handleMessage(type, cb) {
@@ -90,10 +90,10 @@ function handleMessage(type, cb) {
 }
 
 /**
- * @typedef {InitialRoomData | AskToWatch | Offer | Answer} Message
+ * @typedef {RoomData | AskToWatch | Offer | Answer} Message
  *
- * @typedef {Object} InitialRoomData
- * @property {"clients"} type
+ * @typedef {Object} RoomData
+ * @property {"roomData"} type
  * @property {string} yourId
  * @property {{id: string, name: string, streaming: boolean}[]} clients
  *

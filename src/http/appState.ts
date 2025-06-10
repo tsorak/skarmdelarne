@@ -62,6 +62,17 @@ const state = {
             client.send({ type: "clientUpdate", client: entry });
           });
         },
+        roomUpdate: () => {
+          const publicClients = this.clients().toPublic();
+
+          this.data.clients.forEach((client) => {
+            client.send({
+              type: "roomData",
+              yourId: client.id,
+              clients: publicClients,
+            });
+          });
+        },
       },
     };
   },
@@ -78,7 +89,7 @@ type PublicClient = Pick<Client, "id" | "name" | "streaming">;
 
 export default state;
 export type Message =
-  | InitialRoomData
+  | RoomData
   | AskToWatch
   | Offer
   | Answer
@@ -88,8 +99,8 @@ export type Message =
 // 2 An Offer is then made and sent FROM a screensharing client.
 // 3 An Answer is finally made BY the original AskToWatcher.
 
-interface InitialRoomData {
-  type: "initialRoomData";
+interface RoomData {
+  type: "roomData";
   yourId: string;
   clients: PublicClient[];
 }

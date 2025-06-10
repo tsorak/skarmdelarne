@@ -27,16 +27,12 @@ export default function sse() {
           tx.writeSSE({ data: JSON.stringify(m) });
 
         appState.clients().makeFrom(who, nickname, sendMsg);
-
-        sendMsg({
-          type: "initialRoomData",
-          yourId: who,
-          clients: appState.clients().toPublic(),
-        });
+        appState.clients().broadcast.roomUpdate();
 
         let alive = true;
         tx.onAbort(() => {
           appState.clients().remove(who);
+          appState.clients().broadcast.roomUpdate();
           alive = false;
         });
 
