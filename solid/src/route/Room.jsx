@@ -1,10 +1,10 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { createStore, unwrap } from "solid-js/store";
+import { createStore } from "solid-js/store";
 
 import { createCachedSignal } from "../util/cachedSignal.js";
 import { useScreenshare } from "../context/screenshare.jsx";
 
-import api from "../api.js";
+import apiHelper from "./Room/apiHelper.js";
 
 /** @import ../context/screenshare.jsx */
 
@@ -42,27 +42,6 @@ export default function Room(props) {
       streaming: client.streaming,
     });
   });
-
-  // onMount(async () => {
-  //   for await (const msg of cx.rx) {
-  //     switch (msg.type) {
-  //       case "clients":
-  //       case "askToWatch":
-  //       case "offer":
-  //       case "answer":
-  //       default:
-  //         break;
-  //     }
-  //     console.log(msg);
-  //   }
-  // });
-
-  // createEffect(() => {
-  // });
-
-  // onCleanup(() => {
-  //   s.clients.mut({});
-  // });
 
   const handle = {
     setNickname: (ev) => {
@@ -205,18 +184,6 @@ async function handleStopStream(my, s) {
       : "Server rejected our *stopped* streaming status",
   );
 }
-
-const apiHelper = {
-  setStreaming: async (clientId, b) => {
-    const resp = await fetch(`${api.base}/api/client/streaming`, {
-      method: "POST",
-      headers: api.HEADER.CONTENT_JSON,
-      body: JSON.stringify({ id: clientId, streaming: b }),
-    });
-
-    return resp.ok;
-  },
-};
 
 async function getScreen() {
   const media = navigator.mediaDevices;
