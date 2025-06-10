@@ -56,7 +56,12 @@ export default function Room(props) {
         s.clients.mut(produce((state) => {
           delete state[client.id];
         }));
-        break;
+
+        const connection = sscx.peers[client.id];
+
+        if (connection) {
+          break;
+        }
 
       default:
         break;
@@ -87,6 +92,21 @@ export default function Room(props) {
 
   sscx.on("answer", async ({ answer, viewerId }) => {
     await sscx.peers[viewerId].pc.setRemoteDescription(answer);
+  });
+
+  sscx.on("candidate", ({ candidate, as: peerId }) => {
+    // Sometimes a candidate is received before the RemoteDescription has been set.
+    const retry = () => {
+      try {
+        sscx.peers[peerId].pc.addIceCandidate(candidate);
+      } catch (_e) {
+        setTimeout(() => {
+          retry();
+        }, 500);
+      }
+    };
+
+    retry();
   });
 
   const handle = {

@@ -24,6 +24,12 @@ export function ScreenshareProvider(props) {
       await pc.setLocalDescription(offer);
       const success = apiHelper.sendOffer(offer, viewerId, myId);
 
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          apiHelper.sendCandidate(ev.candidate, viewerId, myId);
+        }
+      };
+
       this.peers[viewerId] = { pc };
       return success;
     },
@@ -39,6 +45,12 @@ export function ScreenshareProvider(props) {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       const success = apiHelper.sendAnswer(answer, streamerId, myId);
+
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          apiHelper.sendCandidate(ev.candidate, streamerId, myId);
+        }
+      };
 
       this.peers[streamerId] = { pc };
       return success;
@@ -57,7 +69,7 @@ export function ScreenshareProvider(props) {
  * _source: EventSource,
  * on: typeof handleMessage,
  * addPeer: (peerId: string, myStream: MediaStream, myId: string) => Promise<boolean>,
- * handleOffer: (offer: Object, from: string, s: signals) => Promise<boolean>,
+ * handleOffer: (offer: Object, streamerId: string, ontrack: (ev: Event) => void, myId: string) => Promise<boolean>,
  * peers: {[k: string]: { pc: RTCPeerConnection }}
  * }}
  */
@@ -116,6 +128,11 @@ function setupReceiver() {
  */
 /**
  * @overload
+ * @param {"candidate"} type
+ * @param {(v: Candidate) => void} cb
+ */
+/**
+ * @overload
  * @param {"clientUpdate"} type
  * @param {(v: ClientUpdate) => void} cb
  */
@@ -132,7 +149,7 @@ function handleMessage(type, cb) {
 }
 
 /**
- * @typedef {RoomData | AskToWatch | Offer | Answer} Message
+ * @typedef {RoomData | AskToWatch | Offer | Answer | Candidate | ClientUpdate} Message
  *
  * @typedef {Object} RoomData
  * @property {"roomData"} type
@@ -152,6 +169,11 @@ function handleMessage(type, cb) {
  * @property {"answer"} type
  * @property {string} viewerId,
  * @property {{sdp: string, type: string}} answer
+ *
+ * @typedef {Object} Candidate
+ * @property {"candidate"} type
+ * @property {string} as,
+ * @property {Object} candidate
  *
  * @typedef {Object} ClientUpdate
  * @property {"clientUpdate"} type

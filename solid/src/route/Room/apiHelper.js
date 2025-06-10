@@ -37,6 +37,15 @@ const apiHelper = {
 
     return resp.ok;
   },
+  sendCandidate: async (candidate, peerId, as) => {
+    const resp = await fetch(`${api.base}/api/client/candidate`, {
+      method: "POST",
+      headers: api.HEADER.CONTENT_JSON,
+      body: JSON.stringify({ peerId, as, candidate }),
+    });
+
+    return resp.ok;
+  },
 };
 
 export default apiHelper;

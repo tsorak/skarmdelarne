@@ -91,11 +91,13 @@ export type Message =
   | AskToWatch
   | Offer
   | Answer
+  | Candidate
   | ClientUpdate;
 
-// 1 An AskToWatch gets sent BY a viewer.
-// 2 An Offer is then made and sent FROM a screensharing client.
-// 3 An Answer is finally made BY the original AskToWatcher.
+// 1 An AskToWatch gets sent by a viewer.
+// 2 An Offer is then made and sent from a streamer.
+// 3 An Answer is made by the original AskToWatcher.
+// 4 Candidates are sent between a streamer and a viewer.
 
 interface RoomData {
   type: "roomData";
@@ -118,6 +120,12 @@ interface Answer {
   type: "answer";
   viewerId: string;
   answer: { sdp: string; type: string };
+}
+
+interface Candidate {
+  type: "candidate";
+  as: string;
+  candidate: object;
 }
 
 interface ClientUpdate {
