@@ -1,9 +1,11 @@
 import serve from "./http.ts";
+import { buildClient } from "./dev.ts";
 
-main();
+await main();
 
-function main() {
-  console.log("hello world");
+async function main() {
+  console.clear();
+  await buildClient();
 
   serve();
 }
