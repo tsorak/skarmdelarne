@@ -10,6 +10,17 @@ export default function serve() {
   Deno.serve(app().fetch);
 }
 
+export async function serveHttps() {
+  const [keyPath, certPath] = Deno.args;
+
+  const [key, cert] = await Promise.all([
+    Deno.readTextFile(keyPath),
+    Deno.readTextFile(certPath),
+  ]);
+
+  Deno.serve({ key, cert, port: 8800 }, app().fetch);
+}
+
 function app() {
   const app = new Hono();
 

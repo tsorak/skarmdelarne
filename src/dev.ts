@@ -1,20 +1,11 @@
-export async function buildClient() {
-  const cmd = new Deno.Command("npm", {
-    args: ["run", "build"],
-    cwd: "./solid/",
-    stdout: "inherit",
-    stderr: "piped",
-  });
+import serve from "./http.ts";
+import { buildClient } from "./build.ts";
 
-  console.log("Building client...");
+await main();
 
-  const proc = await cmd.output();
+async function main() {
+  console.clear();
+  await buildClient();
 
-  if (proc.success) {
-    console.log("\n✔  Client built successfully\n");
-  } else {
-    console.log(new TextDecoder().decode(proc.stderr));
-
-    throw new Error(`Build process exited with code: ${proc.code}`);
-  }
+  serve();
 }

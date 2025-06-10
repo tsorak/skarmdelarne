@@ -4,6 +4,7 @@
     "@hono/hono": "jsr:@hono/hono@^4.7.11"
   },
   "tasks" : {
-    "dev": "deno run --allow-all --watch=src/,solid/src/ src/main.ts"
+    "dev": "deno run --allow-all --watch=src/,solid/src/ src/dev.ts",
+    "start": "deno run --allow-all src/main.ts"
   }
 }
