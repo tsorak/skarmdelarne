@@ -26,13 +26,27 @@ export default function sse() {
         const sendMsg = (m: Message) =>
           tx.writeSSE({ data: JSON.stringify(m) });
 
+        sendMsg({
+          type: "roomData",
+          yourId: who,
+          clients: appState.clients().toPublic(),
+        });
+
         appState.clients().makeFrom(who, nickname, sendMsg);
-        appState.clients().broadcast.roomUpdate();
+        appState.clients().broadcast.clientUpdate({
+          type: "clientUpdate",
+          operation: "add",
+          client: { id: who, name: nickname, streaming: false },
+        });
 
         let alive = true;
         tx.onAbort(() => {
           appState.clients().remove(who);
-          appState.clients().broadcast.roomUpdate();
+          appState.clients().broadcast.clientUpdate({
+            type: "clientUpdate",
+            operation: "delete",
+            client: { id: who, name: nickname, streaming: false },
+          });
           alive = false;
         });
 

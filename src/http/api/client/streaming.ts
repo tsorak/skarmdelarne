@@ -10,7 +10,7 @@ export default function client() {
     const [updated, entry] = appState.clients().isStreaming(id, isStreaming);
 
     if (updated) {
-      appState.clients().broadcast.clientUpdate(entry);
+      appState.clients().broadcast.modifyClient(entry);
     }
 
     return c.text("OK");

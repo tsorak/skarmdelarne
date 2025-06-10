@@ -57,19 +57,17 @@ const state = {
         return [true, publicClient];
       },
       broadcast: {
-        clientUpdate: (entry: PublicClient) => {
+        clientUpdate: (msg: ClientUpdate) => {
           this.data.clients.forEach((client) => {
-            client.send({ type: "clientUpdate", client: entry });
+            client.send(msg);
           });
         },
-        roomUpdate: () => {
-          const publicClients = this.clients().toPublic();
-
+        modifyClient: (entry: PublicClient) => {
           this.data.clients.forEach((client) => {
             client.send({
-              type: "roomData",
-              yourId: client.id,
-              clients: publicClients,
+              type: "clientUpdate",
+              operation: "modify",
+              client: entry,
             });
           });
         },
@@ -124,5 +122,6 @@ interface Answer {
 
 interface ClientUpdate {
   type: "clientUpdate";
+  operation: "add" | "modify" | "delete";
   client: PublicClient;
 }

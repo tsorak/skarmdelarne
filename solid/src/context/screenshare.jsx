@@ -113,5 +113,6 @@ function handleMessage(type, cb) {
  *
  * @typedef {Object} ClientUpdate
  * @property {"clientUpdate"} type
+ * @property {"add" | "modify" | "delete"} operation
  * @property {{id: string, name: string, streaming: boolean}} client
  */
