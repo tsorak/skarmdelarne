@@ -1,7 +1,8 @@
 {
   "imports": {
     "$/": "./src/",
-    "@hono/hono": "jsr:@hono/hono@^4.7.11"
+    "@hono/hono": "jsr:@hono/hono@^4.7.11",
+    "@sauber/table": "jsr:@sauber/table@^0.1.0"
   },
   "tasks" : {
     "dev": "deno run --allow-all --watch=src/,solid/src/ src/dev.ts",

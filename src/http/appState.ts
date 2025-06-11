@@ -1,3 +1,5 @@
+import { Table } from "@sauber/table";
+
 const state = {
   data: {
     totalRequests: 0,
@@ -22,13 +24,13 @@ const state = {
         };
 
         this.data.clients.set(id, client);
-        console.log(this.data.clients);
+        console.log(this.clients().statusTable());
 
         return client;
       },
       remove: (id: string) => {
         this.data.clients.delete(id);
-        console.log(this.data.clients);
+        console.log(this.clients().statusTable());
       },
       toPublic: () => {
         const iter = this.data.clients.values().map((
@@ -55,6 +57,18 @@ const state = {
         };
 
         return [true, publicClient];
+      },
+      statusTable: () => {
+        const list = this.data.clients.values().map((
+          c,
+        ) => [c.name, c.streaming ? "🔴" : ""]);
+
+        const t = new Table();
+        t.theme = Table.roundTheme;
+        t.headers = ["name", "live"];
+        t.rows = [...list];
+
+        return t.toString();
       },
       broadcast: {
         clientUpdate: (msg: ClientUpdate) => {

@@ -10,6 +10,7 @@ export default function streaming() {
     const [updated, entry] = appState.clients().isStreaming(id, isStreaming);
 
     if (updated) {
+      console.log(appState.clients().statusTable());
       appState.clients().broadcast.modifyClient(entry);
     }
 

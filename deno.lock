@@ -2,11 +2,15 @@
   "version": "4",
   "specifiers": {
     "jsr:@hono/hono@^4.7.11": "4.7.11",
+    "jsr:@sauber/table@0.1": "0.1.0",
     "npm:create-solid@*": "0.6.5"
   },
   "jsr": {
     "@hono/hono@4.7.11": {
       "integrity": "52b9395e4f2448fbaf82a6bd7925d15e59f4055037e74d6c2f657f3618b11193"
+    },
+    "@sauber/table@0.1.0": {
+      "integrity": "528a02e0023c9e4aa00e438bebd9224263e718fac35fe833bc80b937e3d5ae65"
     }
   },
   "npm": {
@@ -16,7 +20,8 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@hono/hono@^4.7.11"
+      "jsr:@hono/hono@^4.7.11",
+      "jsr:@sauber/table@0.1"
     ]
   }
 }
