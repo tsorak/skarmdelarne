@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { createStore, produce, unwrap } from "solid-js/store";
+import { createStore, produce } from "solid-js/store";
 
 import { createCachedSignal } from "../util/cachedSignal.js";
 import { useScreenshare } from "../context/screenshare.jsx";
@@ -89,12 +89,7 @@ export default function Room(props) {
           delete state[client.id];
         }));
 
-        const connection = sscx.peers[client.id];
-
-        if (connection) {
-          connection.pc.close();
-          delete sscx.peers[client.id];
-        }
+        sscx.removePeer(client.id);
 
         break;
       }
@@ -123,7 +118,7 @@ export default function Room(props) {
       );
     };
 
-    sscx.handleOffer(offer, streamerId, ontrack, myId);
+    sscx.handleOffer(offer, streamerId, myId, ontrack);
   });
 
   sscx.on("answer", async ({ answer, viewerId }) => {
@@ -139,7 +134,7 @@ export default function Room(props) {
       } catch (_e) {
         setTimeout(() => {
           retries += 1;
-          console.log("Retrying to candidate. retries:", retries);
+          console.log("Retrying candidate. retries:", retries);
           retry();
         }, 100);
       }
@@ -198,9 +193,11 @@ function ClientCard(props) {
               <button
                 type="button"
                 class="cursor-pointer"
-                onclick={function () {
+                onclick={async function () {
                   this.disabled = true;
-                  handleStartStream(client, s);
+                  const ok = await handleStartStream(client, s);
+
+                  if (!ok) this.disabled = false;
                 }}
               >
                 Start streaming
@@ -272,7 +269,7 @@ function StreamCard(props) {
 async function handleStartStream(my, s) {
   const [ok, screen] = await getScreen();
 
-  if (!ok) return;
+  if (!ok) return false;
 
   s.clients.mut(my.id, { stream: screen });
 
@@ -282,6 +279,8 @@ async function handleStartStream(my, s) {
       ? "Server knows we are streaming"
       : "Server rejected our *start* streaming status",
   );
+
+  return success;
 }
 
 async function handleStopStream(my, s) {

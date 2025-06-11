@@ -26,6 +26,20 @@ export function ScreenshareProvider(props) {
         pc.addTrack(track, myStream);
       });
 
+      if (!pc.onconnectionstatechange) {
+        pc.onconnectionstatechange = (_ev) => {
+          console.log(`[${pc.connectionState}] ${viewerId}`);
+          switch (pc.connectionState) {
+            case "disconnected":
+            case "failed":
+              this.removePeer(viewerId);
+              break;
+            default:
+              break;
+          }
+        };
+      }
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       const success = apiHelper.sendOffer(offer, viewerId, myId);
@@ -41,7 +55,7 @@ export function ScreenshareProvider(props) {
       this.peers[viewerId] = { pc };
       return success;
     },
-    handleOffer: async function (offer, streamerId, ontrack, myId) {
+    handleOffer: async function (offer, streamerId, myId, ontrack) {
       let pc;
 
       if (this.peers[streamerId]) {
@@ -53,6 +67,19 @@ export function ScreenshareProvider(props) {
       }
 
       if (!pc.ontrack) pc.ontrack = ontrack;
+      if (!pc.onconnectionstatechange) {
+        pc.onconnectionstatechange = (_ev) => {
+          console.log(`[${pc.connectionState}] ${streamerId}`);
+          switch (pc.connectionState) {
+            case "disconnected":
+            case "failed":
+              this.removePeer(streamerId);
+              break;
+            default:
+              break;
+          }
+        };
+      }
 
       await pc.setRemoteDescription(offer);
 
@@ -71,6 +98,16 @@ export function ScreenshareProvider(props) {
       this.peers[streamerId] = { pc };
       return success;
     },
+    removePeer: function (id) {
+      const peer = this.peers[id];
+
+      if (!peer) return false;
+
+      peer?.pc.close();
+      delete this.peers[id];
+
+      return true;
+    },
   };
 
   return (
@@ -85,7 +122,8 @@ export function ScreenshareProvider(props) {
  * _source: EventSource,
  * on: typeof handleMessage,
  * addPeer: (peerId: string, myStream: MediaStream, myId: string) => Promise<boolean>,
- * handleOffer: (offer: Object, streamerId: string, ontrack: (ev: Event) => void, myId: string) => Promise<boolean>,
+ * handleOffer: (offer: Object, streamerId: string, myId: string, ontrack: (ev: Event) => void) => Promise<boolean>,
+ * removePeer: (id: string) => boolean,
  * peers: {[k: string]: { pc: RTCPeerConnection }}
  * }}
  */
