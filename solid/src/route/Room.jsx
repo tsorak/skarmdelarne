@@ -154,7 +154,7 @@ export default function Room(props) {
   };
 
   return (
-    <main class="h-screen">
+    <main class="h-screen dark:bg-neutral-900 dark:text-neutral-300">
       <Show when={s.showNickInput.get()}>
         <form class="flex gap-2 p-1" onsubmit={handle.setNickname}>
           <p>Enter your nickname:</p>
@@ -170,7 +170,7 @@ export default function Room(props) {
           />
         </form>
       </Show>
-      <div class="h-full flex flex-wrap justify-center items-center">
+      <div class="h-full flex flex-wrap justify-center items-center gap-4 select-none">
         <For each={s.clients.values()}>
           {(c) => <ClientCard c={c} s={s} />}
         </For>
@@ -182,27 +182,26 @@ export default function Room(props) {
 function ClientCard(props) {
   const { c: client, s } = props;
 
-  return (
-    <div
-      class={`relative w-[480px] h-[270px] bg-black text-white flex flex-col`}
-    >
-      <Show when={!client.streaming} fallback={<StreamCard c={client} s={s} />}>
-        <div class="flex justify-end">
-          {s.myId.cmp(client.id) &&
-            (
-              <button
-                type="button"
-                class="cursor-pointer"
-                onclick={async function () {
-                  this.disabled = true;
-                  const ok = await handleStartStream(client, s);
+  const isMe = s.myId.cmp(client.id);
 
-                  if (!ok) this.disabled = false;
-                }}
-              >
-                Start streaming
-              </button>
-            )}
+  return (
+    <div class="relative w-[480px] h-[270px] bg-black text-white flex flex-col shadow-xl/40">
+      <Show when={!client.streaming} fallback={<StreamCard c={client} s={s} />}>
+        <div class="flex justify-end mx-1">
+          <Show when={isMe}>
+            <button
+              type="button"
+              class="cursor-pointer"
+              onclick={async function () {
+                this.disabled = true;
+                const ok = await handleStartStream(client, s);
+
+                if (!ok) this.disabled = false;
+              }}
+            >
+              Start streaming
+            </button>
+          </Show>
         </div>
         <div class="flex-grow flex flex-col justify-center items-center">
           <p class="text-3xl">{client.name}</p>
@@ -230,26 +229,34 @@ function StreamCard(props) {
         />
       </Show>
       <div class="absolute z-11 w-full h-full flex flex-col pointer-events-none">
-        <div class="flex justify-between">
+        <div class="flex justify-between items-center">
           <p class="w-min bg-[#0004]">{client.name}</p>
-          <Show when={isMe}>
-            <button
-              type="button"
-              class="cursor-pointer pointer-events-auto"
-              onclick={function () {
-                this.disabled = true;
-                handleStopStream(client, s);
-              }}
+          <div class="flex items-center mx-1 gap-1">
+            <Show
+              when={isMe}
+              fallback={
+                <div class="w-4 h-4 rounded-full bg-red-500 animate-pulse" />
+              }
             >
-              Stop streaming
-            </button>
-          </Show>
+              <button
+                type="button"
+                class="cursor-pointer pointer-events-auto flex items-center gap-1"
+                onclick={function () {
+                  this.disabled = true;
+                  handleStopStream(client, s);
+                }}
+              >
+                Stop streaming{" "}
+                <div class="w-4 h-4 rounded-full bg-red-500 animate-pulse" />
+              </button>
+            </Show>
+          </div>
         </div>
         <div class="flex-grow flex flex-col justify-center items-center">
           <Show when={!isMe && !s.clients.v[client.id]?.stream}>
             <button
               type="button"
-              class="cursor-pointer pointer-events-auto"
+              class="cursor-pointer pointer-events-auto bg-[#fff2] py-3 px-6 rounded-full hover:scale-[105%] hover:bg-[#fff3] active:bg-[#eee3] transition-all duration-250 text-xl"
               onclick={function () {
                 this.disabled = true;
                 apiHelper.askToWatch(client.id, s.myId.get());
