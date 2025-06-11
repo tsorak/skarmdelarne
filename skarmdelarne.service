@@ -1,0 +1,14 @@
+[Unit]
+Description=Skarmdelarne - Screensharing application
+After=network-online.target
+
+[Service]
+Type=simple
+User=skarmdelarne
+Group=skarmdelarne
+ExecStart=/usr/bin/deno run start ~/key.pem ~/cert.pem
+WorkingDirectory=/srv/skarmdelarne
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
