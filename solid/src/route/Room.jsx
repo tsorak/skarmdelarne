@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
-import { createStore, produce } from "solid-js/store";
+import { createStore, produce, unwrap } from "solid-js/store";
 
 import { createCachedSignal } from "../util/cachedSignal.js";
 import { useScreenshare } from "../context/screenshare.jsx";
@@ -29,30 +29,62 @@ export default function Room(props) {
   const sscx = useScreenshare();
 
   sscx.on("roomData", ({ clients, yourId }) => {
+    s.myId.set(yourId);
+
+    // roomData should only trigger once per session.
+    // The server has most likely restarted and the EventSource re-established connection.
+    if (Object.keys(s.clients.v).length > 0) {
+      return;
+    }
+
     const entries = clients.map((v) => [v.id, v]);
     const obj = Object.fromEntries(entries);
 
-    s.myId.set(yourId);
     s.clients.mut(obj);
   });
 
   sscx.on("clientUpdate", ({ operation, client }) => {
     switch (operation) {
-      case "modify":
+      case "modify": {
+        let noLongerStreaming = false;
         s.clients.mut(
           client.id,
           produce((state) => {
+            if (state.streaming && !client.streaming) {
+              noLongerStreaming = true;
+              delete state.stream;
+            }
+
             state.name = client.name;
             state.streaming = client.streaming;
           }),
         );
+
+        // If a client we were watching is not streaming anymore, cleanup
+        if (noLongerStreaming) {
+          // Exit early if were not watching the stream.
+          const pc = sscx.peers[client.id]?.pc;
+          if (!pc) return;
+
+          // If we are not streaming to them, close the PeerConnection entirely.
+          if ((s.clients.v[s.myId.get()]?.streaming == false) ?? true) {
+            console.log(
+              "Peer is not streaming to us and we are not streaming to them. Closing connection.",
+            );
+            pc.close();
+            delete sscx.peers[client.id];
+          }
+        }
         break;
+      }
+
       case "add":
         s.clients.mut(produce((state) => {
           state[client.id] = client;
         }));
         break;
-      case "delete":
+
+      case "delete": {
         s.clients.mut(produce((state) => {
           delete state[client.id];
         }));
@@ -60,8 +92,12 @@ export default function Room(props) {
         const connection = sscx.peers[client.id];
 
         if (connection) {
-          break;
+          connection.pc.close();
+          delete sscx.peers[client.id];
         }
+
+        break;
+      }
 
       default:
         break;
@@ -81,8 +117,8 @@ export default function Room(props) {
       s.clients.mut(
         streamerId,
         produce((state) => {
+          console.log("Attaching remote stream", ev.streams[0]);
           state.stream = ev.streams[0];
-          console.log("LOL", ev.streams);
         }),
       );
     };
@@ -95,14 +131,17 @@ export default function Room(props) {
   });
 
   sscx.on("candidate", ({ candidate, as: peerId }) => {
+    let retries = 0;
     // Sometimes a candidate is received before the RemoteDescription has been set.
     const retry = () => {
       try {
         sscx.peers[peerId].pc.addIceCandidate(candidate);
       } catch (_e) {
         setTimeout(() => {
+          retries += 1;
+          console.log("Retrying to candidate. retries:", retries);
           retry();
-        }, 500);
+        }, 100);
       }
     };
 
@@ -235,8 +274,6 @@ async function handleStartStream(my, s) {
 
   if (!ok) return;
 
-  console.log(screen);
-
   s.clients.mut(my.id, { stream: screen });
 
   const success = await apiHelper.setStreaming(my.id, true);
@@ -278,10 +315,17 @@ async function getScreen() {
     return [false, null];
   }
 
-  const screen = await media.getDisplayMedia({
-    video: true,
-    audio: true,
-  });
+  let screen;
+
+  try {
+    screen = await media.getDisplayMedia({
+      video: true,
+      audio: true,
+    });
+  } catch (e) {
+    console.error(e);
+    return [false, null];
+  }
 
   return [true, screen];
 }

@@ -12,9 +12,15 @@ export function ScreenshareProvider(props) {
     init: setupReceiver,
     on: handleMessage,
     addPeer: async function (viewerId, myStream, myId) {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
+      let pc;
+
+      if (this.peers[viewerId]) {
+        pc = this.peers[viewerId].pc;
+      } else {
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+      }
 
       myStream.getTracks().forEach((track) => {
         pc.addTrack(track, myStream);
@@ -24,21 +30,29 @@ export function ScreenshareProvider(props) {
       await pc.setLocalDescription(offer);
       const success = apiHelper.sendOffer(offer, viewerId, myId);
 
-      pc.onicecandidate = (ev) => {
-        if (ev.candidate) {
-          apiHelper.sendCandidate(ev.candidate, viewerId, myId);
-        }
-      };
+      if (!pc.onicecandidate) {
+        pc.onicecandidate = (ev) => {
+          if (ev.candidate) {
+            apiHelper.sendCandidate(ev.candidate, viewerId, myId);
+          }
+        };
+      }
 
       this.peers[viewerId] = { pc };
       return success;
     },
     handleOffer: async function (offer, streamerId, ontrack, myId) {
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
+      let pc;
 
-      pc.ontrack = ontrack;
+      if (this.peers[streamerId]) {
+        pc = this.peers[streamerId].pc;
+      } else {
+        pc = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
+      }
+
+      if (!pc.ontrack) pc.ontrack = ontrack;
 
       await pc.setRemoteDescription(offer);
 
@@ -46,11 +60,13 @@ export function ScreenshareProvider(props) {
       await pc.setLocalDescription(answer);
       const success = apiHelper.sendAnswer(answer, streamerId, myId);
 
-      pc.onicecandidate = (ev) => {
-        if (ev.candidate) {
-          apiHelper.sendCandidate(ev.candidate, streamerId, myId);
-        }
-      };
+      if (!pc.onicecandidate) {
+        pc.onicecandidate = (ev) => {
+          if (ev.candidate) {
+            apiHelper.sendCandidate(ev.candidate, streamerId, myId);
+          }
+        };
+      }
 
       this.peers[streamerId] = { pc };
       return success;
