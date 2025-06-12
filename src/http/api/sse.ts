@@ -13,15 +13,25 @@ export default function sse() {
       streamSSE(c, async (tx) => {
         const nickname = getCookie(c, "skarmdelarne_nickname");
 
-        if (!nickname) {
+        // The uuid the client wants to be known as.
+        // It is what peers know eachother by.
+        //
+        // We have most likely set this as the server.
+        // The reason we allow the user to have control over the uuid is
+        // clients may lose connection and when they regain connection
+        // everyones peer id-s should not change as it would cause ui updates
+        // and break ongoing screensharing sessions.
+        const uuid = getCookie(c, "skarmdelarne_uuid");
+
+        if (!nickname || !uuid) {
           await tx.writeSSE({
-            data: "No skarmdelarne_nickname received. Goodbye",
+            data: "Invalid skarmdelarne session. Goodbye",
           });
           tx.abort();
           return;
         }
 
-        const who = crypto.randomUUID() as string;
+        const who = uuid;
 
         const sendMsg = (m: Message) =>
           tx.writeSSE({ data: JSON.stringify(m) });

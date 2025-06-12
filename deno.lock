@@ -1,11 +1,17 @@
 {
   "version": "4",
   "specifiers": {
+    "jsr:@gz/jwt@*": "0.1.0",
+    "jsr:@gz/jwt@0.1": "0.1.0",
     "jsr:@hono/hono@^4.7.11": "4.7.11",
     "jsr:@sauber/table@0.1": "0.1.0",
-    "npm:create-solid@*": "0.6.5"
+    "npm:create-solid@*": "0.6.5",
+    "npm:zod@^3.25.63": "3.25.63"
   },
   "jsr": {
+    "@gz/jwt@0.1.0": {
+      "integrity": "32b0235cebcb85d363459b20ccaab0d8424fab89883c9f65caa1e2ad37e78e8f"
+    },
     "@hono/hono@4.7.11": {
       "integrity": "52b9395e4f2448fbaf82a6bd7925d15e59f4055037e74d6c2f657f3618b11193"
     },
@@ -16,12 +22,17 @@
   "npm": {
     "create-solid@0.6.5": {
       "integrity": "sha512-SYj0EZTY61Icp2TIFpeEiEAOZF/UlNCS1IFe4oz+G4Xv5bDAD+4pz2WRsy0KT04zDsFb8g/zp0yY9mNintCGkw=="
+    },
+    "zod@3.25.63": {
+      "integrity": "sha512-3ttCkqhtpncYXfP0f6dsyabbYV/nEUW+Xlu89jiXbTBifUfjaSqXOG6JnQPLtqt87n7KAmnMqcjay6c0Wq0Vbw=="
     }
   },
   "workspace": {
     "dependencies": [
+      "jsr:@gz/jwt@0.1",
       "jsr:@hono/hono@^4.7.11",
-      "jsr:@sauber/table@0.1"
+      "jsr:@sauber/table@0.1",
+      "npm:zod@^3.25.63"
     ]
   }
 }
