@@ -3,115 +3,120 @@ import { createContext, useContext } from "solid-js";
 import api from "../api.js";
 import apiHelper from "../route/Room/apiHelper.js";
 
+class State {
+  _source;
+  handlers = {};
+  peers = {};
+
+  init = setupReceiver;
+  on = handleMessage;
+
+  async addPeer(viewerId, myStream, myId) {
+    let pc;
+
+    if (this.peers[viewerId]) {
+      pc = this.peers[viewerId].pc;
+    } else {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+    }
+
+    myStream.getTracks().forEach((track) => {
+      pc.addTrack(track, myStream);
+    });
+
+    if (!pc.onconnectionstatechange) {
+      pc.onconnectionstatechange = (_ev) => {
+        console.log(`[${pc.connectionState}] ${viewerId}`);
+        switch (pc.connectionState) {
+          case "disconnected":
+          case "failed":
+            this.removePeer(viewerId);
+            break;
+          default:
+            break;
+        }
+      };
+    }
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const success = apiHelper.sendOffer(offer, viewerId, myId);
+
+    if (!pc.onicecandidate) {
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          apiHelper.sendCandidate(ev.candidate, viewerId, myId);
+        }
+      };
+    }
+
+    this.peers[viewerId] = { pc };
+    return success;
+  }
+
+  async handleOffer(offer, streamerId, myId, ontrack) {
+    let pc;
+
+    if (this.peers[streamerId]) {
+      pc = this.peers[streamerId].pc;
+    } else {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      });
+    }
+
+    if (!pc.ontrack) pc.ontrack = ontrack;
+    if (!pc.onconnectionstatechange) {
+      pc.onconnectionstatechange = (_ev) => {
+        console.log(`[${pc.connectionState}] ${streamerId}`);
+        switch (pc.connectionState) {
+          case "disconnected":
+          case "failed":
+            this.removePeer(streamerId);
+            break;
+          default:
+            break;
+        }
+      };
+    }
+
+    await pc.setRemoteDescription(offer);
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    const success = apiHelper.sendAnswer(answer, streamerId, myId);
+
+    if (!pc.onicecandidate) {
+      pc.onicecandidate = (ev) => {
+        if (ev.candidate) {
+          apiHelper.sendCandidate(ev.candidate, streamerId, myId);
+        }
+      };
+    }
+
+    this.peers[streamerId] = { pc };
+    return success;
+  }
+
+  removePeer(id) {
+    const peer = this.peers[id];
+
+    if (!peer) return false;
+
+    peer?.pc.close();
+    delete this.peers[id];
+
+    return true;
+  }
+}
+
 const ScreenshareContext = createContext();
 
 export function ScreenshareProvider(props) {
-  const state = {
-    handlers: {},
-    peers: {},
-    init: setupReceiver,
-    on: handleMessage,
-    addPeer: async function (viewerId, myStream, myId) {
-      let pc;
-
-      if (this.peers[viewerId]) {
-        pc = this.peers[viewerId].pc;
-      } else {
-        pc = new RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        });
-      }
-
-      myStream.getTracks().forEach((track) => {
-        pc.addTrack(track, myStream);
-      });
-
-      if (!pc.onconnectionstatechange) {
-        pc.onconnectionstatechange = (_ev) => {
-          console.log(`[${pc.connectionState}] ${viewerId}`);
-          switch (pc.connectionState) {
-            case "disconnected":
-            case "failed":
-              this.removePeer(viewerId);
-              break;
-            default:
-              break;
-          }
-        };
-      }
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const success = apiHelper.sendOffer(offer, viewerId, myId);
-
-      if (!pc.onicecandidate) {
-        pc.onicecandidate = (ev) => {
-          if (ev.candidate) {
-            apiHelper.sendCandidate(ev.candidate, viewerId, myId);
-          }
-        };
-      }
-
-      this.peers[viewerId] = { pc };
-      return success;
-    },
-    handleOffer: async function (offer, streamerId, myId, ontrack) {
-      let pc;
-
-      if (this.peers[streamerId]) {
-        pc = this.peers[streamerId].pc;
-      } else {
-        pc = new RTCPeerConnection({
-          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-        });
-      }
-
-      if (!pc.ontrack) pc.ontrack = ontrack;
-      if (!pc.onconnectionstatechange) {
-        pc.onconnectionstatechange = (_ev) => {
-          console.log(`[${pc.connectionState}] ${streamerId}`);
-          switch (pc.connectionState) {
-            case "disconnected":
-            case "failed":
-              this.removePeer(streamerId);
-              break;
-            default:
-              break;
-          }
-        };
-      }
-
-      await pc.setRemoteDescription(offer);
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      const success = apiHelper.sendAnswer(answer, streamerId, myId);
-
-      if (!pc.onicecandidate) {
-        pc.onicecandidate = (ev) => {
-          if (ev.candidate) {
-            apiHelper.sendCandidate(ev.candidate, streamerId, myId);
-          }
-        };
-      }
-
-      this.peers[streamerId] = { pc };
-      return success;
-    },
-    removePeer: function (id) {
-      const peer = this.peers[id];
-
-      if (!peer) return false;
-
-      peer?.pc.close();
-      delete this.peers[id];
-
-      return true;
-    },
-  };
-
   return (
-    <ScreenshareContext.Provider value={state}>
+    <ScreenshareContext.Provider value={new State()}>
       {props.children}
     </ScreenshareContext.Provider>
   );
@@ -127,6 +132,9 @@ export function ScreenshareProvider(props) {
  * peers: {[k: string]: { pc: RTCPeerConnection }}
  * }}
  */
+function xd() {}
+
+/** @returns {State} */
 export function useScreenshare() {
   return useContext(ScreenshareContext);
 }
