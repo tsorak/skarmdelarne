@@ -28,6 +28,12 @@ export async function serveHttps() {
   Deno.serve({ key, cert, port: 8800 }, app().fetch);
 }
 
+export function serveDenoDeploy() {
+  const defaults = new Hono();
+
+  Deno.serve(app(defaults).fetch);
+}
+
 function app(app = new Hono()) {
   app.use(logger());
 

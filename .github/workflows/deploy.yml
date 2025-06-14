@@ -32,5 +32,5 @@ jobs:
         uses: denoland/deployctl@v1
         with:
           project: "skarmdelarne"
-          entrypoint: "src/main.ts"
+          entrypoint: "src/dd.ts"
           root: "."
