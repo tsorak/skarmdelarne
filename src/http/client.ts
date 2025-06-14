@@ -6,5 +6,7 @@ export default function client() {
 
   app.use("*", serveStatic({ root: "solid/dist/" }));
 
+  app.use("/auth", serveStatic({ path: "solid/dist/index.html" }));
+
   return app;
 }

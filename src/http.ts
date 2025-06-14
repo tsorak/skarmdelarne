@@ -9,8 +9,9 @@ export default function serve() {
   const defaults = new Hono();
 
   defaults.use(cors({
-    origin: "*",
-    allowMethods: ["GET"],
+    origin: "http://localhost:3000",
+    allowMethods: ["GET", "POST"],
+    credentials: true,
   }));
 
   Deno.serve(app(defaults).fetch);

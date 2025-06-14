@@ -1,16 +1,16 @@
 import { Route, Router } from "@solidjs/router";
 
-import api from "./api.js";
-
 import { ScreenshareProvider } from "./context/screenshare.jsx";
+import { SessionProvider } from "./context/session.jsx";
+import { LoaderProvider } from "./context/loader.jsx";
 
 import Room from "./route/Room.jsx";
+import Auth from "./route/Auth.jsx";
 
 function App() {
-  console.log(api.base);
-
   return (
     <Router root={Layout}>
+      <Route path="/auth" component={Auth} />
       <Route path="*" component={Room} />
     </Router>
   );
@@ -18,9 +18,13 @@ function App() {
 
 function Layout(props) {
   return (
-    <ScreenshareProvider>
-      {props.children}
-    </ScreenshareProvider>
+    <LoaderProvider>
+      <SessionProvider>
+        <ScreenshareProvider>
+          {props.children}
+        </ScreenshareProvider>
+      </SessionProvider>
+    </LoaderProvider>
   );
 }
 

@@ -1,4 +1,5 @@
 import { createContext, useContext } from "solid-js";
+import { cookie } from "cookie.js";
 
 import api from "../api.js";
 import apiHelper from "../route/Room/apiHelper.js";
@@ -154,6 +155,13 @@ function setupReceiver() {
     try {
       msg = JSON.parse(v);
     } catch (_e) {
+      console.log("error parsing:", v);
+
+      if (v === "BAD_SESSION") {
+        cookie.remove("skarmdelarne_nickname");
+        location.replace("/auth");
+      }
+
       return;
     }
 

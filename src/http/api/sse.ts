@@ -1,8 +1,9 @@
 import { Hono } from "@hono/hono";
 import { streamSSE } from "@hono/hono/streaming";
-import { getCookie } from "@hono/hono/cookie";
 
 import appState, { type Message } from "$/http/appState.ts";
+
+import { getSession } from "./auth/helper.ts";
 
 export default function sse() {
   const app = new Hono();
@@ -11,27 +12,18 @@ export default function sse() {
     "/",
     (c) =>
       streamSSE(c, async (tx) => {
-        const nickname = getCookie(c, "skarmdelarne_nickname");
+        const token = await getSession(c).key("token")?.and?.verifyJWT() ??
+          null;
 
-        // The uuid the client wants to be known as.
-        // It is what peers know eachother by.
-        //
-        // We have most likely set this as the server.
-        // The reason we allow the user to have control over the uuid is
-        // clients may lose connection and when they regain connection
-        // everyones peer id-s should not change as it would cause ui updates
-        // and break ongoing screensharing sessions.
-        const uuid = getCookie(c, "skarmdelarne_uuid");
-
-        if (!nickname || !uuid) {
+        if (!token) {
           await tx.writeSSE({
-            data: "Invalid skarmdelarne session. Goodbye",
+            data: "BAD_SESSION",
           });
           tx.abort();
           return;
         }
 
-        const who = uuid;
+        const { uuid: who, nickname } = token;
 
         const sendMsg = (m: Message) =>
           tx.writeSSE({ data: JSON.stringify(m) });

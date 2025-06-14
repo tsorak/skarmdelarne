@@ -6,10 +6,24 @@ import { useScreenshare } from "../context/screenshare.jsx";
 
 import apiHelper from "./Room/apiHelper.js";
 import handleSse from "./Room/handleSse.js";
+import { useSession } from "../context/session.jsx";
 
 /** @import ../context/screenshare.jsx */
 
 export default function Room(props) {
+  const sscx = useScreenshare();
+
+  const session = useSession();
+  {
+    const { ok, elseRedirect } = session.exists();
+
+    if (ok) {
+      sscx.init();
+    } else {
+      elseRedirect("/auth");
+    }
+  }
+
   const s = (() => {
     const [clients, mutClients] = createStore({});
     const [showNickInput, setShowNickInput] = createSignal(true);
@@ -27,37 +41,10 @@ export default function Room(props) {
     };
   })();
 
-  const sscx = useScreenshare();
-
   handleSse(sscx, s);
-
-  const handle = {
-    setNickname: (ev) => {
-      ev.preventDefault();
-
-      document.cookie = `skarmdelarne_nickname=${s.nickname.get()}`;
-      sscx.init();
-      s.showNickInput.set(false);
-    },
-  };
 
   return (
     <main class="h-screen dark:bg-neutral-900 dark:text-neutral-300">
-      <Show when={s.showNickInput.get()}>
-        <form class="flex gap-2 p-1" onsubmit={handle.setNickname}>
-          <p>Enter your nickname:</p>
-          <input
-            class="border-b-2 border-dotted focus:outline-none"
-            type="text"
-            autocomplete="off"
-            spellcheck={false}
-            name="nick_input"
-            autofocus
-            value={s.nickname.get()}
-            oninput={(e) => s.nickname.set(e.target.value)}
-          />
-        </form>
-      </Show>
       <div class="h-full flex flex-wrap justify-center items-center gap-4 select-none">
         <For each={s.clients.values()}>
           {(c) => <ClientCard c={c} s={s} />}

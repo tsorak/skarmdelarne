@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",
+    "cookie.js": "^7.0.1",
     "solid-js": "^1.9.5"
   }
 }

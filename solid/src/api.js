@@ -1,5 +1,5 @@
 const config = {
-  base: import.meta.env.DEV ? "http://v4:8000" : location.origin,
+  base: import.meta.env.DEV ? "http://localhost:8000" : location.origin,
   HEADER: {
     CONTENT_JSON: { "Content-Type": "application/json" },
   },

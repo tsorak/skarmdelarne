@@ -1,5 +1,5 @@
 export async function buildClient() {
-  const cmd = new Deno.Command("npm", {
+  const cmd = new Deno.Command("bun", {
     args: ["run", "build"],
     cwd: "./solid/",
     stdout: "inherit",
